@@ -43,6 +43,7 @@ import android.util.Log;
 
 public class CalendarEvents extends ReactContextBaseJavaModule {
 
+    private static final String TAG = "XGCalendarEvents";
     private static int PERMISSION_REQUEST_CODE = 37;
     private final ReactContext reactContext;
     private static final String RNC_PREFS = "REACT_NATIVE_CALENDAR_PREFERENCES";
@@ -50,6 +51,7 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
 
     public CalendarEvents(ReactApplicationContext reactContext) {
         super(reactContext);
+        Log.d(TAG, "Constructor");
         this.reactContext = reactContext;
     }
 
@@ -272,7 +274,8 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
     }
 
     //region Event Accessors
-    private WritableNativeArray findEvents(Dynamic startDate, Dynamic endDate, ReadableArray calendars) {
+    private WritableNativeArray findEvents(Dynamic startDate, Dynamic endDate, ReadableArray calendars, Boolean isLite) {
+        Log.i(TAG, "findevents");
         String dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
         SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
@@ -305,14 +308,18 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
 
         Uri uri = uriBuilder.build();
 
-        String selection = "((" + CalendarContract.Instances.BEGIN + " >= " + eStartDate.getTimeInMillis() + ") " +
-                "AND (" + CalendarContract.Instances.END + " <= " + eEndDate.getTimeInMillis() + ") " +
-                "AND (" + CalendarContract.Instances.VISIBLE + " = 1) " +
+//        String selection = "((" + CalendarContract.Instances.BEGIN + " >= " + eStartDate.getTimeInMillis() + ") " +
+//                "AND (" + CalendarContract.Instances.END + " <= " + eEndDate.getTimeInMillis() + ") " +
+//                "AND (" + CalendarContract.Instances.VISIBLE + " = 1) " +
+//                "AND (" + CalendarContract.Instances.STATUS + " IS NOT " + CalendarContract.Events.STATUS_CANCELED + ") ";
+        String selection = "(" +
+                "(" + CalendarContract.Instances.VISIBLE + " = 1) " +
                 "AND (" + CalendarContract.Instances.STATUS + " IS NOT " + CalendarContract.Events.STATUS_CANCELED + ") ";
-
+        Log.d(TAG, "findevents calendar size:" + calendars.size());
         if (calendars.size() > 0) {
             String calendarQuery = "AND (";
             for (int i = 0; i < calendars.size(); i++) {
+                Log.d(TAG, "calendar:" + CalendarContract.Instances.CALENDAR_ID + " string:" +calendars.getString(i));
                 calendarQuery += CalendarContract.Instances.CALENDAR_ID + " = " + calendars.getString(i);
                 if (i != calendars.size() - 1) {
                     calendarQuery += " OR ";
@@ -323,6 +330,8 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
         }
 
         selection += ")";
+
+        Log.d(TAG, "findevents selection" + selection + " uri" + uri);
 
         cursor = cr.query(uri, new String[]{
                 CalendarContract.Instances.EVENT_ID,
@@ -342,8 +351,8 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
                 CalendarContract.Instances.ORIGINAL_SYNC_ID,
         }, selection, null, null);
 
-
-        return serializeEvents(cursor);
+        Log.d(TAG, "findevents cursor" );
+        return serializeEvents(cursor, isLite);
     }
 
     private WritableNativeMap findEventById(String eventID) {
@@ -966,20 +975,28 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
     //endregion
 
     // region Serialize Events
-    private WritableNativeArray serializeEvents(Cursor cursor) {
+    private WritableNativeArray serializeEvents(Cursor cursor, Boolean isLite) {
         WritableNativeArray results = new WritableNativeArray();
+        Log.d(TAG, "findevents results " + (cursor != null) );
         if (cursor != null) {
+            Log.d(TAG, "findevents results " + cursor.getCount() );
             while (cursor.moveToNext()) {
-                results.pushMap(serializeEvent(cursor));
+                Log.d(TAG, "findevents move to next"  );
+                results.pushMap(serializeEvent(cursor, isLite));
+                Log.d(TAG, "findevents move to next" + results );
             }
 
             cursor.close();
         }
-
+        Log.d(TAG, "findevents results" + results );
         return results;
     }
 
     private WritableNativeMap serializeEvent(Cursor cursor) {
+        return serializeEvent(cursor, false);
+    }
+
+    private WritableNativeMap serializeEvent(Cursor cursor, Boolean isLite) {
         WritableNativeMap event = new WritableNativeMap();
 
         String dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
@@ -1042,7 +1059,7 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
         }
 
         event.putString("id", cursor.getString(0));
-        event.putMap("calendar", findCalendarById(cursor.getString(cursor.getColumnIndex("calendar_id"))));
+        event.putString("calendarId", cursor.getString(cursor.getColumnIndex("calendar_id")));
         event.putString("title", cursor.getString(cursor.getColumnIndex("title")));
         event.putString("description", cursor.getString(2));
         event.putString("startDate", startDateUTC);
@@ -1050,7 +1067,7 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
         event.putBoolean("allDay", allDay);
         event.putString("location", cursor.getString(6));
         event.putString("availability", availabilityStringMatchingConstant(cursor.getInt(9)));
-        event.putArray("attendees", (WritableArray) findAttendeesByEventId(cursor.getString(0)));
+        Log.d(TAG, "findevents results"+ cursor.getString(cursor.getColumnIndex("title")) + " "+ event );
 
         if (cursor.getInt(10) > 0) {
             event.putArray("alarms", findReminderByEventId(cursor.getString(0), Long.parseLong(cursor.getString(3))));
@@ -1065,6 +1082,11 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
 
         if (cursor.getColumnIndex(CalendarContract.Instances.ORIGINAL_SYNC_ID) != -1 && cursor.getString(cursor.getColumnIndex(CalendarContract.Instances.ORIGINAL_SYNC_ID)) != null) {
             event.putString("syncId", cursor.getString(cursor.getColumnIndex(CalendarContract.Instances.ORIGINAL_SYNC_ID)));
+        }
+
+        if (isLite != true) {
+            event.putMap("calendar", findCalendarById(cursor.getString(cursor.getColumnIndex("calendar_id"))));
+            event.putArray("attendees", (WritableArray) findAttendeesByEventId(cursor.getString(0)));
         }
 
         return event;
@@ -1243,14 +1265,14 @@ public class CalendarEvents extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void findAllEvents(final Dynamic startDate, final Dynamic endDate, final ReadableArray calendars, final Promise promise) {
+    public void findAllEvents(final Dynamic startDate, final Dynamic endDate, final ReadableArray calendars, final Boolean isLite, final Promise promise) {
 
         if (this.haveCalendarReadWritePermissions()) {
             try {
                 Thread thread = new Thread(new Runnable(){
                     @Override
                     public void run() {
-                        WritableNativeArray results = findEvents(startDate, endDate, calendars);
+                        WritableNativeArray results = findEvents(startDate, endDate, calendars, isLite);
                         promise.resolve(results);
                     }
                 });

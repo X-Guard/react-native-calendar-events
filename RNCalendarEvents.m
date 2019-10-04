@@ -30,19 +30,10 @@ dispatch_queue_t serialQueue;
 - (NSString *)hexStringFromColor:(UIColor *)color {
     const CGFloat *components = CGColorGetComponents(color.CGColor);
 
-    CGFloat r;
-    CGFloat g;
-    CGFloat b;
-    if(components && sizeof(components) >= 3){
-        r = components[0];
-        g = components[1];
-        b = components[2];
-    }else{
-        r = 1;
-        g = 1;
-        b = 1;
-    }
-    
+    CGFloat r = components[0];
+    CGFloat g = components[1];
+    CGFloat b = components[2];
+
     return [NSString stringWithFormat:@"#%02lX%02lX%02lX",
             lroundf(r * 255),
             lroundf(g * 255),
@@ -502,8 +493,9 @@ RCT_EXPORT_MODULE()
     }
 
     if (event.calendar) {
+        [formedCalendarEvent setValue:event.calendar.calendarIdentifier forKey:@"calendarId"];
         [formedCalendarEvent setValue:@{
-                                        @"id": event.calendar.calendarIdentifier?event.calendar.calendarIdentifier: @"tempCalendar",
+                                        @"id": event.calendar.calendarIdentifier,
                                         @"title": event.calendar.title ? event.calendar.title : @"",
                                         @"source": event.calendar.source && event.calendar.source.title ? event.calendar.source.title : @"",
                                         @"allowsModifications": @(event.calendar.allowsContentModifications),
@@ -664,7 +656,7 @@ RCT_EXPORT_MODULE()
 
     [formedCalendarEvent setValue:[self availabilityStringMatchingConstant:event.availability] forKey:_availability];
     
-    if (event.structuredLocation && event.structuredLocation.title && event.structuredLocation.radius) {
+    if (event.structuredLocation) {
         NSMutableDictionary *structuredLocation = [[NSMutableDictionary alloc] initWithCapacity:3];
         [structuredLocation addEntriesFromDictionary: @{
                                                         @"title": event.structuredLocation.title,
