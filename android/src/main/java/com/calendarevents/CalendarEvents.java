@@ -42,6 +42,7 @@ import java.util.TimeZone;
 import android.util.Log;
 
 public class CalendarEvents extends ReactContextBaseJavaModule {
+    public static final String NAME = "CalendarEvents";
 
     private static final String TAG = "XGCalendarEvents";
     private static int PERMISSION_REQUEST_CODE = 37;

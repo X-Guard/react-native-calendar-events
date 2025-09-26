@@ -27,6 +27,17 @@ dispatch_queue_t serialQueue;
 
 @implementation RNCalendarEvents
 
+#if __has_include(<React/RCTTurboModule.h>)
+// TurboModule support for new architecture
+RCT_EXPORT_MODULE(CalendarEvents)
+// Required for TurboModule
++ (NSString *)moduleName {
+    return @"CalendarEvents";
+}
+#else
+RCT_EXPORT_MODULE()
+#endif
+
 - (NSString *)hexStringFromColor:(UIColor *)color {
     const CGFloat *components = CGColorGetComponents(color.CGColor);
 
